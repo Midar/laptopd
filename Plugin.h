@@ -18,6 +18,8 @@
 
 #import <ObjFW/ObjFW.h>
 
+#import "LaptopD.h"
+
 /**
  * @brief Protocol shared by all plugins for laptopd.
  */
@@ -41,6 +43,13 @@
  * plugin is applicable for the system.
  */
 @property (readonly, nonatomic) bool shouldLoad;
+
+/**
+ * @brief A map of devices handled by the plugin to the capabilities the plugin
+ *	  can handle for them.
+ */
+@property (readonly, nonatomic)
+    OFDictionary<OFString *, OFArray<capability_t> *> *devices;
 
 /**
  * @brief This is called when the plugin should prepare for privileges being

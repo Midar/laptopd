@@ -28,8 +28,10 @@
 
 @implementation LinuxBatteryPlugin
 {
-	OFMutableDictionary<OFString *, OFFile *> *_endThresholds;
+	OFDictionary<OFString *, OFFile *> *_endThresholds;
 }
+
+@synthesize devices = _devices;
 
 - (OFString *)name
 {
@@ -60,11 +62,16 @@
 	OFFileManager *fileManager = OFFileManager.defaultManager;
 	OFURL *batteriesURL = [OFURL URLWithString: BAT_URL_STRING];
 
-	_endThresholds = [OFMutableDictionary dictionary];
+	OFMutableDictionary<OFString *, OFArray<capability_t> *> *devices =
+	    [OFMutableDictionary dictionary];
+	OFMutableDictionary<OFString *, OFFile *> *endThresholds =
+	    [OFMutableDictionary dictionary];
 
 	for (OFURL *candidate in
 	    [fileManager contentsOfDirectoryAtURL: batteriesURL]) {
-		if (![candidate.lastPathComponent hasPrefix: @"BAT"])
+		OFString *name = candidate.lastPathComponent;
+
+		if (![name hasPrefix: @"BAT"])
 			continue;
 
 		if (![fileManager directoryExistsAtURL: candidate])
@@ -80,8 +87,15 @@
 			continue;
 		}
 
-		_endThresholds[candidate.lastPathComponent] = file;
+		devices[name] = @[ @"charge_control_end_threshold" ];
+		endThresholds[name] = file;
 	}
+
+	[devices makeImmutable];
+	_devices = devices;
+
+	[endThresholds makeImmutable];
+	_endThresholds = endThresholds;
 }
 @end
 

@@ -50,6 +50,18 @@
 	return [OFFileManager.defaultManager directoryExistsAtPath: WMI_PATH];
 }
 
+- (OFDictionary<OFString *, OFArray<capability_t> *> *)devices
+{
+	OFMutableArray *capabilities = [OFMutableArray array];
+
+	if (_thermalThrottlePolicy != nil)
+		[capabilities addObject: @"fan_control"];
+	if (_dGPUYeet != nil)
+		[capabilities addObject: @"dgpu_switching"];
+
+	return @{ @"asus-nb-wmi": capabilities };
+}
+
 - (void)prepareForPrivilegeDrop
 {
 	OFString *thermalThrottlePolicyPath = [WMI_PATH

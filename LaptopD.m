@@ -22,6 +22,7 @@
 
 #import <ObjFW/ObjFW.h>
 
+#import "LaptopD.h"
 #import "Plugin.h"
 
 @interface LaptopD: OFObject <OFApplicationDelegate>
@@ -30,6 +31,10 @@
 OF_APPLICATION_DELEGATE(LaptopD)
 
 @implementation LaptopD
+{
+	OFArray<OFPlugin <Plugin> *> *_plugins;
+}
+
 - (void)applicationDidFinishLaunching
 {
 	OFString *modulesDir =
@@ -39,18 +44,25 @@ OF_APPLICATION_DELEGATE(LaptopD)
 
 	for (OFString *module in
 	    [fileManager contentsOfDirectoryAtPath: modulesDir]) {
-		void *pool = objc_autoreleasePoolPush();
-		OFString *pluginPath = [OFString pathWithComponents:
-		    @[ modulesDir, module, module ]];
-		OFPlugin <Plugin> *plugin =
-		    [OFPlugin pluginWithPath: pluginPath];
+		@autoreleasepool {
+			OFString *pluginPath = [OFString pathWithComponents:
+			    @[ modulesDir, module, module ]];
+			OFPlugin <Plugin> *plugin =
+			    [OFPlugin pluginWithPath: pluginPath];
 
-		if (plugin.shouldLoad) {
-			of_log(@"Loaded %@ %@", plugin.name, plugin.version);
-			[plugins addObject: plugin];
+			/*
+			 * Extra @autoreleasepool to make sure that anything
+			 * created by -[shouldLoad] is released before the
+			 * plugin is unloaded again.
+			 */
+			@autoreleasepool {
+				if (plugin.shouldLoad) {
+					of_log(@"Loaded %@ %@",
+					    plugin.name, plugin.version);
+					[plugins addObject: plugin];
+				}
+			}
 		}
-
-		objc_autoreleasePoolPop(pool);
 	}
 
 	of_log(@"%zu plugin(s) loaded", plugins.count);
@@ -58,13 +70,21 @@ OF_APPLICATION_DELEGATE(LaptopD)
 	of_log(@"Preparing to drop privileges");
 	OFMutableArray <OFPlugin <Plugin> *> *pluginsToDrop =
 	    [OFMutableArray array];
-	for (OFPlugin <Plugin> *plugin in plugins) {
-		@try {
-			[plugin prepareForPrivilegeDrop];
-		} @catch (id e) {
-			of_log(@"%@ %@ failed to prepare for privilege drop, "
-			    @"removing...", plugin.name, plugin.version);
-			[pluginsToDrop addObject: plugin];
+	/*
+	 * Extra @autoreleasepool to make sure that anything created by
+	 * -[prepareForPrivilegeDrop] is released before the plugin is unloaded
+	 *  again.
+	 */
+	@autoreleasepool {
+		for (OFPlugin <Plugin> *plugin in plugins) {
+			@try {
+				[plugin prepareForPrivilegeDrop];
+			} @catch (id e) {
+				of_log(@"%@ %@ failed to prepare for privilege "
+				    @"drop, removing...",
+				    plugin.name, plugin.version);
+				[pluginsToDrop addObject: plugin];
+			}
 		}
 	}
 	for (OFPlugin <Plugin> *plugin in pluginsToDrop)
@@ -72,9 +92,20 @@ OF_APPLICATION_DELEGATE(LaptopD)
 	[pluginsToDrop removeAllObjects];
 	pluginsToDrop = nil;
 
+	[plugins makeImmutable];
+	_plugins = plugins;
+
 	/* FIXME: Make arguments */
 	struct passwd *passwd = getpwnam("nobody");
+	if (passwd == NULL) {
+		of_log(@"getpwnam() failed: %s", strerror(errno));
+		[OFApplication terminateWithStatus: 1];
+	}
 	struct group *group = getgrnam("nobody");
+	if (group == NULL) {
+		of_log(@"getgrnam() failed: %s", strerror(errno));
+		[OFApplication terminateWithStatus: 1];
+	}
 	if (setgid(group->gr_gid) != 0) {
 		of_log(@"setgid() failed: %s", strerror(errno));
 		[OFApplication terminateWithStatus: 1];
@@ -85,5 +116,10 @@ OF_APPLICATION_DELEGATE(LaptopD)
 	}
 
 	of_log(@"Privileges dropped");
+
+	for (OFPlugin <Plugin> *plugin in _plugins)
+		of_log(@"%@ %@ handles the following devices with the "
+		    @"following capabilities: %@",
+		    plugin.name, plugin.version, plugin.devices);
 }
 @end
