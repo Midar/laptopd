@@ -4,15 +4,18 @@ libexecdir ?= ${prefix}/libexec
 
 all:
 	objfw-compile --arc -DLIBDIR='"${libdir}"'  -o laptopd LaptopD.m
-	objfw-compile --arc --plugin -o asus ASUSPlugin.m
+	objfw-compile --arc --plugin -o asus_linux ASUSLinuxPlugin.m
+	objfw-compile --arc --plugin -o linux_battery LinuxBatteryPlugin.m
 
 clean:
 	rm -f laptopd *.o *.so
 
 install: all
 	install -m 755 laptopd ${libexecdir}/laptopd
-	install -d ${libdir}/laptopd/asus
-	install -m 755 asus.so ${libdir}/laptopd/asus/asus.so
+	for i in asus_linux linux_battery; do \
+		install -d ${libdir}/laptopd/$$i; \
+		install -m 755 $$i.so ${libdir}/laptopd/$$i/$$i.so; \
+	done
 
 uninstall:
 	rm -f ${libexecdir}/laptopd

@@ -19,7 +19,6 @@
 #import "Plugin.h"
 
 #define WMI_PATH @"/sys/devices/platform/asus-nb-wmi"
-#define BAT0_PATH @"/sys/class/power_supply/BAT0"
 
 /**
  * @brief A plugin for various ASUS laptops.
@@ -28,17 +27,17 @@
  * the laptop the author has. If people offer to test laptopd with the
  * ASUSPlugin on their laptop, the author is happy to add support for them.
  */
-@interface ASUSPlugin: OFPlugin <Plugin>
+@interface ASUSLinuxPlugin: OFPlugin <Plugin>
 @end
 
-@implementation ASUSPlugin
+@implementation ASUSLinuxPlugin
 {
-	OFFile *_thermalThrottlePolicy, *_chargeControlEndThreshold, *_dGPUYeet;
+	OFFile *_thermalThrottlePolicy, *_dGPUYeet;
 }
 
 - (OFString *)name
 {
-	return @"ASUS laptop plugin";
+	return @"ASUS laptop Linux plugin";
 }
 
 - (OFString *)version
@@ -48,26 +47,18 @@
 
 - (bool)shouldLoad
 {
-	OFFileManager *fileManager = OFFileManager.defaultManager;
-
-	return [fileManager directoryExistsAtPath: WMI_PATH] &&
-	    [fileManager directoryExistsAtPath: BAT0_PATH];
+	return [OFFileManager.defaultManager directoryExistsAtPath: WMI_PATH];
 }
 
 - (void)prepareForPrivilegeDrop
 {
 	OFString *thermalThrottlePolicyPath = [WMI_PATH
 	    stringByAppendingPathComponent: @"throttle_thermal_policy"];
-	OFString *chargeControlEndThresholdPath = [BAT0_PATH
-	    stringByAppendingPathComponent: @"charge_control_end_threshold"];
 	OFString *dGPUYeetPath = [WMI_PATH
 	    stringByAppendingPathComponent: @"dgpu_yeet"];
 
 	_thermalThrottlePolicy = [OFFile
 	    fileWithPath: thermalThrottlePolicyPath
-		    mode: @"w+"];
-	_chargeControlEndThreshold = [OFFile
-	    fileWithPath: chargeControlEndThresholdPath
 		    mode: @"w+"];
 	@try {
 		_dGPUYeet = [OFFile fileWithPath: dGPUYeetPath mode: @"w+"];
@@ -78,16 +69,10 @@
 		 */
 	}
 }
-
-- (void)test
-{
-	[_thermalThrottlePolicy writeLine: @"1"];
-	[_thermalThrottlePolicy writeLine: @"2"];
-}
 @end
 
 id
 init_plugin(void)
 {
-	return [[ASUSPlugin alloc] init];
+	return [[ASUSLinuxPlugin alloc] init];
 }
